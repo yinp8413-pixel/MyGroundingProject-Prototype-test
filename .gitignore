@@ -1,0 +1,42 @@
+# Datasets / raw data
+data/
+drone
+drone/
+quad
+quad/
+waymo
+waymo/
+splits
+splits/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local environments / secrets
+.env
+.venv/
+venv/
+
+# Build byproducts
+build/
+dist/
+*.so
+*.o
+
+# Experiment artifacts kept local
+*.pth
+*.pt
+*.ckpt
+logs/**/tensorboard/
+logs/**/events.out.tfevents.*
