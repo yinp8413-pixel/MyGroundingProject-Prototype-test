@@ -78,6 +78,11 @@ def parse_option():
     parser.add_argument("--prop_neg_iou_thr", type=float, default=0.25)
     parser.add_argument("--prop_hn_topk", type=int, default=5)
     parser.add_argument("--prop_proto_warmup_epoch", type=int, default=0)
+    parser.add_argument(
+        "--freeze_box_generation_for_prop_proto",
+        action="store_true",
+        help="Freeze visual/query proposal and box regression parts for proposal-ranking fine-tuning.",
+    )
     parser.add_argument("--enable_platform_probe", action="store_true", help="Enable per-platform train-loss diagnostics.")
     parser.add_argument("--platform_probe_freq", type=int, default=100, help="Run platform probe every N train batches.")
     parser.add_argument("--platform_probe_warmup", type=int, default=1, help="Start platform probe from this epoch.")
@@ -471,6 +476,35 @@ class BaseTrainTester:
         return criterion, set_criterion
 
     @staticmethod
+    def freeze_box_generation_for_prop_proto(model):
+        """Freeze geometry generation while leaving ranking-related layers trainable."""
+        frozen_prefixes = (
+            "backbone_net",
+            "cross_encoder",
+            "points_obj_cls",
+            "decoder_query_proj",
+            "proposal_head",
+            "pos_embed",
+        )
+        frozen_substrings = (
+            "center_residual_head",
+            "size_pred_head",
+            "objectness_scores_head",
+        )
+        frozen_count = 0
+        trainable_count = 0
+        for name, param in model.named_parameters():
+            should_freeze = name.startswith(frozen_prefixes) or any(
+                item in name for item in frozen_substrings
+            )
+            if should_freeze:
+                param.requires_grad = False
+                frozen_count += param.numel()
+            elif param.requires_grad:
+                trainable_count += param.numel()
+        return frozen_count, trainable_count
+
+    @staticmethod
     def get_optimizer(args, model, set_criterion=None):
         """Initialize optimizer."""
         param_dicts = [
@@ -502,6 +536,12 @@ class BaseTrainTester:
         
         # Get model
         model = self.get_model(args)
+        if args.freeze_box_generation_for_prop_proto:
+            frozen_count, trainable_count = self.freeze_box_generation_for_prop_proto(model)
+            self.logger.info(
+                "Frozen box-generation parameters for proposal-ranking fine-tune: "
+                f"frozen={frozen_count}, trainable={trainable_count}"
+            )
 
         # Get criterion
         criterion, set_criterion = self.get_criterion(args)
