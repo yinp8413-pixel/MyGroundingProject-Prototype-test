@@ -35,8 +35,7 @@ dist/
 *.o
 
 # Experiment artifacts kept local
+logs/
 *.pth
 *.pt
 *.ckpt
-logs/**/tensorboard/
-logs/**/events.out.tfevents.*

@@ -152,6 +152,8 @@ def parse_option():
     # Set log_dir based on eval mode
     if args.eval:
         # For evaluation: use checkpoint_path's parent directory + /evaluation
+        if not args.checkpoint_path:
+            parser.error("--checkpoint_path is required when --eval (or --eval_train) is set")
         checkpoint_dir = os.path.dirname(args.checkpoint_path)
         
         test_datasets = "_".join(args.test_dataset)
@@ -207,21 +209,6 @@ def load_checkpoint(args, model, optimizer, scheduler, set_criterion=None):
 
     del checkpoint
     torch.cuda.empty_cache()
-
-
-def backup_python_files(self, backup_dirs, target_dir):
-    """
-    Backup specified python files/folders to target directory.
-
-    Args:
-        backup_dirs (list): List of directories or files to backup.
-        target_dir (str): Where to store the backup.
-    """
-    for item in backup_dirs:
-        if os.path.isdir(item):
-            shutil.copytree(item, os.path.join(target_dir, item), dirs_exist_ok=True)
-        elif item.endswith(".py"):
-            shutil.copy2(item, target_dir)
 
 
 def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False, set_criterion=None):
@@ -556,7 +543,15 @@ class BaseTrainTester:
                 "epoch {}, total time {:.2f}, "
                 "lr_base {:.5f}, lr_pointnet {:.5f}".format(epoch, (time.time() - tic), optimizer.param_groups[0]["lr"], optimizer.param_groups[1]["lr"])
             )
-            if epoch % args.val_freq == 0:
+            force_prop_proto_eval_epochs = set()
+            if args.use_prop_proto and args.prop_proto_warmup_epoch > 0:
+                force_prop_proto_eval_epochs = {
+                    args.prop_proto_warmup_epoch + 1,
+                    args.prop_proto_warmup_epoch + 2,
+                    args.prop_proto_warmup_epoch + 3,
+                }
+            should_eval = epoch % args.val_freq == 0 or epoch in force_prop_proto_eval_epochs
+            if should_eval:
                 if dist.get_rank() == 0:  # save model
                     save_checkpoint(args, epoch, model, optimizer, scheduler, set_criterion=set_criterion)
                 print("Test evaluation.......")
